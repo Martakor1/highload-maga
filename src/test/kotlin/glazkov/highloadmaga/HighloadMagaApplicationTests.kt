@@ -1,0 +1,13 @@
+package glazkov.highloadmaga
+
+import org.junit.jupiter.api.Test
+import org.springframework.boot.test.context.SpringBootTest
+
+@SpringBootTest
+class HighloadMagaApplicationTests {
+
+    @Test
+    fun contextLoads() {
+    }
+
+}
