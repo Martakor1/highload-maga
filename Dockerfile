@@ -20,4 +20,8 @@ WORKDIR /app
 COPY --from=builder /home/gradle/project/build/libs/*.jar /app/app.jar
 
 EXPOSE 8080
+# Добавляем переменную окружения с JVM-параметрами по умолчанию.
+# Используем процент от доступной памяти контейнера (для Java 11+). Это позволит куче расти автоматически до указанного процента от лимита контейнера.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=25 -XX:MaxDirectMemorySize=128m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -XX:+UseG1GC"
+
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
