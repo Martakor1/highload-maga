@@ -1,0 +1,5 @@
+auth_modules:
+  - foo1:
+    options:
+      # options become key=value parameters of the DSN
+      sslmode: disable

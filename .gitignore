@@ -44,3 +44,4 @@ prometheus/data
 
 gradlew
 gradlew.bat
+.env
