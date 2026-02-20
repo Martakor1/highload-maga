@@ -1,6 +1,7 @@
 package glazkov.highloadmaga
 
 import org.springframework.cache.annotation.Cacheable
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import java.lang.Thread.sleep
 //import org.springframework.transaction.annotation.Transactional
@@ -23,7 +24,10 @@ class UserService(private val userRepository: UserRepository) {
 
 
     //@Transactional(readOnly = true)
-    fun getAll(): List<UserEntity> = userRepository.findAll()
+    fun getAll(limit: Int): List<UserEntity> {
+        val pageable = PageRequest.of(0, limit)
+        return userRepository.findAll(pageable).content
+    }
 
     //@Transactional
     fun create(dto: CreateUserRequestDto): UserEntity {

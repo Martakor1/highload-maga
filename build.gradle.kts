@@ -46,6 +46,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-liquibase")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-cache")
+//    implementation("io.springfox:springfox-swagger2:2.7.0")
+//    implementation("io.springfox:springfox-swagger-ui:2.7.0")
 }
 
 kotlin {

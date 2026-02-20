@@ -8,7 +8,7 @@ export default function () {
     // Create a random user
     //http.post('http://localhost:8080/users/random');
     // Get all users
-    const res = http.get('http://localhost:8080/users?limit=10');
+    const res = http.get('http://localhost:8080/replica/users?limit=10');
     let usrArray = [];
     try {
         if (res.status !== 200) {
@@ -25,7 +25,7 @@ export default function () {
         if (ids.length > 0) {
             const id = ids[Math.floor(Math.random() * ids.length)];
             // Request single user by id
-            http.get(`http://localhost:8080/users/nocache/${id}/100000`);
+            http.get(`http://localhost:8080/replica/users/${id}/100000`);
         } else {
             console.warn('No ids found in usrArray');
         }

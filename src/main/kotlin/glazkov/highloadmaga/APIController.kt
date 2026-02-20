@@ -8,7 +8,10 @@ import java.lang.Thread.sleep
 import java.util.*
 
 @RestController
-class APIController(private val userService: UserService) {
+class APIController(
+    private val userService: UserService,
+    private val replicaUserService: ReplicaUserService
+) {
 
     val logger: Logger = LoggerFactory.getLogger(APIController::class.java)
 
@@ -31,9 +34,20 @@ class APIController(private val userService: UserService) {
         return ResponseEntity.ok(UserResponse(created.id, created.username, created.name, created.age))
     }
 
+    @PostMapping("/users/random_heavy")
+    fun createUserRandomHeavy(): ResponseEntity<UserResponse> {
+        val username = "user_" + UUID.randomUUID().toString().replace("-", "").take(8)
+        val password = UUID.randomUUID().toString()
+        val hugeName = (1.. 100 * 1024 * 256).map { "Иван" }.joinToString("") //~200MB name
+        val age = (18..80).random()
+        val dto = CreateUserRequestDto(username, password, hugeName, age)
+        val created = userService.create(dto)
+        return ResponseEntity.ok(UserResponse(created.id, created.username, created.name, created.age))
+    }
+
     @PostMapping("/users/random/delete")
-    fun deleteUserRandom(): ResponseEntity<String> {
-        val allUsers = userService.getAll()
+    fun deleteUserRandom(@RequestParam limit: Int): ResponseEntity<String> {
+        val allUsers = userService.getAll(limit)
         if (allUsers.isEmpty()) {
             return ResponseEntity.ok("No users to delete")
         }
@@ -43,14 +57,26 @@ class APIController(private val userService: UserService) {
     }
 
     @GetMapping("/users")
-    fun listUsers(): ResponseEntity<List<UserResponse>> {
-        val list = userService.getAll().map { UserResponse(it.id, it.username, it.name, it.age) }
+    fun listUsers(@RequestParam limit: Int): ResponseEntity<List<UserResponse>> {
+        val list = userService.getAll(limit).map { UserResponse(it.id, it.username, it.name, it.age) }
+        return ResponseEntity.ok(list)
+    }
+
+    @GetMapping("/replica/users")
+    fun listUsersFromReplica(@RequestParam limit: Int): ResponseEntity<List<UserResponse>> {
+        val list = replicaUserService.getAll(limit).map { UserResponse(it.id, it.username, it.name, it.age) }
         return ResponseEntity.ok(list)
     }
 
     @GetMapping("/users/{id}/{load}")
     fun getUser(@PathVariable id: UUID, @PathVariable load: Int): ResponseEntity<UserResponse> {
         val user = userService.getUser(id, load) ?: return ResponseEntity.notFound().build()
+        return ResponseEntity.ok(UserResponse(user.id, user.username, user.name, user.age))
+    }
+
+    @GetMapping("/replica/users/{id}/{load}")
+    fun getUserFromReplica(@PathVariable id: UUID, @PathVariable load: Int): ResponseEntity<UserResponse> {
+        val user = replicaUserService.getUserByIdHeavy(id, load) ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(UserResponse(user.id, user.username, user.name, user.age))
     }
 

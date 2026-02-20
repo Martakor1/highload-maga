@@ -1,6 +1,6 @@
 services:
   online-shop:
-    mem_limit: 1048m
+    mem_limit: 4048m
     build:
         context: .
         dockerfile: Dockerfile
@@ -70,21 +70,117 @@ services:
     networks:
       - external_network
 
+  # patroni1:
+  #   image: ongres/patroni:latest
+  #   hostname: pg1
+  #   user: root
+  #   volumes:
+  #     - ./patroni1.yml:/config/patroni.yml
+  #     # - patroni1-data:/data/patroni
+  #   command: mkdir /data/patroni -p && chown postgres:postgres /data/patroni && chmod 700 /data/patroni && patroni /config/patroni.yml
+  #   # mkdir /data/patroni -p && chown postgres:postgres /data/patroni && chmod 700 /data/patroni && patroni /config/patroni.yml
+  #   environment:
+  #     PATRONI_SCOPE: pgsql
+  #     PATRONI_NAME: pg1
+      
+  #     PATRONI_API_CONNECT_PORT: 8091
+  #     REPLICATION_NAME: replicator 
+  #     REPLICATION_PASS: replpass
+  #     SU_NAME: postgres
+  #     SU_PASS: supass
+  #     POSTGRES_APP_ROLE_PASS: appass
+  #   depends_on:
+  #     - etcd
+  #   networks:
+  #     - external_network
+
+  # patroni2:
+  #   image: ongres/patroni:latest
+  #   hostname: pg2
+  #   user: root
+  #   volumes:
+  #     - ./patroni2.yml:/config/patroni.yml
+  #     # - patroni2-data:/data/patroni
+  #   command: patroni /config/patroni.yml
+  #   environment:
+  #     PATRONI_SCOPE: pgsql
+  #     PATRONI_NAME: pg2
+
+  #     PATRONI_API_CONNECT_PORT: 8091
+  #     REPLICATION_NAME: replicator 
+  #     REPLICATION_PASS: replpass
+  #     SU_NAME: postgres
+  #     SU_PASS: supass
+  #     POSTGRES_APP_ROLE_PASS: appass
+  #   depends_on:
+  #     - etcd
+  #   networks:
+  #     - external_network
+
   postgres:
-    image: postgres:14.9-alpine
-    env_file:
-      - ./.env
+    image: postgres:17.4-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - ${POSTGRES_CONTAINER_EXPOSED_PORT}:${POSTGRES_CONTAINER_INTERNAL_PORT} #todo
-    command: postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all -c max_connections=200
-    #command: postgres
-    restart: unless-stopped
+      - "5432:5432"
+    volumes:
+      - pg_master_data:/var/lib/postgresql/data
+      - ./init-master.sh:/docker-entrypoint-initdb.d/init-master.sh
     networks:
       - external_network
+    command: >
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=3
+      -c max_replication_slots=3
+      -c hot_standby=on
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '1.0'
+#          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop_db -d shop_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # # PostgreSQL Replica (Read-Only)
+  pg-replica:
+    image: postgres:17.4-alpine
+    container_name: pg-replica
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    user: root
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_replica_data:/var/lib/postgresql/data
+      - ./init-replica.sh:/init-replica.sh:ro
+    networks:
+      - external_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "/init-replica.sh"]
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.5'
+#          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
 
   postgres-exporter:
     image: bitnami/postgres-exporter:latest
@@ -93,9 +189,10 @@ services:
     env_file:
       - ./.env
     environment:
-      DATA_SOURCE_URI: postgres:${POSTGRES_CONTAINER_INTERNAL_PORT}/${POSTGRES_DB}?sslmode=disable
-      DATA_SOURCE_USER: ${POSTGRES_USER}
-      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
+      DATA_SOURCE_NAME: postgresql://shop_db:shop_db@postgres:5432/shop_db?sslmode=disable,postgresql://replicator:replicapass@pg-replica:5432/shop_db?sslmode=disable
+      # DATA_SOURCE_URI: postgres:${POSTGRES_CONTAINER_INTERNAL_PORT}/${POSTGRES_DB}?sslmode=disable,pg-replica
+      # DATA_SOURCE_USER: ${POSTGRES_USER}
+      # DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
     ports:
       - "9187:9187"
     depends_on:
@@ -103,7 +200,41 @@ services:
     networks:
       - external_network
 
+  # etcd: #DCS for the patroni (like ZooKeeper for Kafka)
+  #   image: bitnamilegacy/etcd:latest
+  #   ports:
+  #     - "2379:2379"
+  #     - "2380:2380"
+  #   environment:
+  #     - ALLOW_NONE_AUTHENTICATION=yes
+  #     - ETCD_ENABLE_V2=true
+  #     - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379 #рекламирует свой url
+  #     - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379 #реально где слушает
+  #   networks:
+  #     - external_network
+
+  # haproxy:
+  #   image: haproxy:latest
+  #   ports:
+  #     - "5000:5000"
+  #   volumes:
+  #     - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+  #   depends_on:
+  #     - online-shop
+  #     - patroni1
+  #     - patroni2
+  #     - etcd
+
+
 
 networks:
   external_network:
     driver: bridge
+
+volumes:
+  pg_master_data:
+  pg_replica_data:
+
+# volumes:
+#   patroni1-data: 
+#   patroni2-data:

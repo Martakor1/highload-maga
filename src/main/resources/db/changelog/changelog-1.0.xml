@@ -36,4 +36,18 @@
         <addDefaultValue tableName="users" columnName="id" defaultValueComputed="gen_random_uuid()"/>
     </changeSet>
 
+    <changeSet id="drop-unique-constraint-username" author="Andrey Glazkov">
+        <dropUniqueConstraint tableName="users" constraintName="users_username_key"/>
+    </changeSet>
+
+    <changeSet id="change-username-to-text" author="Andrey Glazkov">
+        <modifyDataType tableName="users" columnName="username" newDataType="text"/>
+    </changeSet>
+
+    <changeSet id="change-name-to-text" author="Andrey Glazkov">
+        <modifyDataType tableName="users" columnName="name" newDataType="text"/>
+    </changeSet>
+
 </databaseChangeLog>
+
+

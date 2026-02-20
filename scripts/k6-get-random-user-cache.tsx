@@ -33,5 +33,5 @@ export default function () {
         console.warn('/users returned empty or non-array');
     }
     // small sleep to avoid hammering too hard
-    sleep(0.01);
+    sleep(0.1);
 }
