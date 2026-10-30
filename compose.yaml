@@ -183,7 +183,7 @@ services:
       start_period: 30s
 
   postgres-exporter:
-    image: bitnami/postgres-exporter:latest
+    image: soldevelo/postgres-exporter:latest
     volumes:
       - ./postgres_exporter.yml:/opt/bitnami/postgres-exporter/postgres_exporter.yml
     env_file:
